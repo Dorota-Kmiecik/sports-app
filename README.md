@@ -16,7 +16,8 @@ Wpisy są automatycznie zapisywane w pamięci lokalnej przeglądarki (`localStor
 - dowolna liczba dni treningowych,
 - minimum 5 ćwiczeń i 3 serie w każdym dniu,
 - osobne pola na powtórzenia i kilogramy w każdej serii,
+- kolorowe oznaczenie odczuwanego wysiłku dla każdej serii,
 - dodatkowe ćwiczenia i serie,
-- analiza ciężaru, objętości, liczby serii i powtórzeń,
-- filtrowanie progresu według ćwiczenia i zakresu dat,
+- osobne wykresy ciężaru i liczby serii dla każdego ćwiczenia,
+- filtrowanie progresu według zakresu dat,
 - responsywny widok na komputerze i telefonie.
