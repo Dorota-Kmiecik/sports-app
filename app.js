@@ -111,14 +111,14 @@ function renderMonthTabs() {
 
 function renderDayCard(day) {
   const filledCount = day.exercises.filter(exercise => exercise.name.trim()).length;
-  const seriesHeaders = Array.from({ length: day.seriesCount }, (_, index) => `<th>SERIA ${index + 1}<br><span>POWT. / KG</span></th>`).join("");
+  const seriesHeaders = Array.from({ length: day.seriesCount }, (_, index) => `<th><div class="series-header"><span>SERIA ${index + 1}<small>POWT. / KG</small></span><button class="delete-series" type="button" data-set="${index}" aria-label="Usuń serię ${index + 1}" title="Usuń serię ${index + 1}">×</button></div></th>`).join("");
   return `<article class="day-card ${day.collapsed ? "collapsed" : ""}" data-day-id="${day.id}">
     <div class="day-header">
       <div class="day-header-main"><span class="day-number">${new Date(`${day.date}T12:00:00`).getDate()}</span><div><h3>${titleCase(formatDate(day.date, { weekday: "long" }))}</h3><p>${formatDate(day.date, { day: "numeric", month: "long", year: "numeric" })}</p></div></div>
       <div class="day-meta"><span class="exercise-count">${filledCount} ${plural(filledCount, "ćwiczenie", "ćwiczenia", "ćwiczeń")}</span><svg class="chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></div>
     </div>
     <div class="workout-body">
-      <table class="workout-table"><thead><tr><th>ĆWICZENIE</th>${seriesHeaders}<th></th></tr></thead><tbody>${day.exercises.map((exercise, row) => renderExerciseRow(exercise, row)).join("")}</tbody></table>
+      <table class="workout-table"><thead><tr><th>ĆWICZENIE</th>${seriesHeaders}</tr></thead><tbody>${day.exercises.map((exercise, row) => renderExerciseRow(exercise, row)).join("")}</tbody></table>
       <div class="effort-help"><strong>Dotykaj „Oznacz”, aby zmieniać kolor:</strong><span><i class="effort-dot green"></i>duży zapas</span><span><i class="effort-dot orange"></i>mały zapas</span><span><i class="effort-dot red"></i>ledwo ukończona</span></div>
       <div class="table-actions"><button class="text-button add-exercise"><span>＋</span> Dodaj ćwiczenie</button><div><button class="text-button add-series"><span>＋</span> Dodaj serię</button><button class="text-button remove-day">Usuń dzień</button></div></div>
     </div>
@@ -127,9 +127,8 @@ function renderDayCard(day) {
 
 function renderExerciseRow(exercise, row) {
   return `<tr data-exercise-id="${exercise.id}">
-    <td><input class="exercise-input" data-field="name" value="${escapeHtml(exercise.name)}" placeholder="${row < 5 ? `Ćwiczenie ${row + 1}` : "Nazwa ćwiczenia"}" /></td>
+    <td><div class="exercise-cell"><button class="delete-row" type="button" aria-label="Usuń ćwiczenie" title="Usuń ćwiczenie">×</button><input class="exercise-input" data-field="name" value="${escapeHtml(exercise.name)}" placeholder="${row < 5 ? `Ćwiczenie ${row + 1}` : "Nazwa ćwiczenia"}" /></div></td>
     ${exercise.sets.map((set, setIndex) => `<td class="set-cell ${set.effort ? `effort-${set.effort}` : ""}"><div class="set-pair"><input class="set-input" type="number" min="0" inputmode="numeric" data-set="${setIndex}" data-field="reps" value="${escapeHtml(set.reps)}" placeholder="powt." aria-label="Powtórzenia, seria ${setIndex + 1}"/><input class="set-input" type="number" min="0" step="0.5" inputmode="decimal" data-set="${setIndex}" data-field="weight" value="${escapeHtml(set.weight)}" placeholder="kg" aria-label="Ciężar, seria ${setIndex + 1}"/></div><div class="effort-picker"><button class="effort-cycle ${set.effort || "empty"}" data-set="${setIndex}" type="button" title="Dotknij, aby zmienić odczucie" aria-label="Seria ${setIndex + 1}: ${effortName(set.effort)}. Dotknij, aby zmienić"><i></i><span>${effortShortName(set.effort)}</span></button></div></td>`).join("")}
-    <td><button class="delete-row" aria-label="Usuń ćwiczenie" title="Usuń wiersz">×</button></td>
   </tr>`;
 }
 
@@ -146,8 +145,13 @@ function bindJournalEvents() {
     $(".add-series", card).addEventListener("click", () => { day.seriesCount++; day.exercises.forEach(exercise => exercise.sets.push({ reps: "", weight: "", effort: "" })); saveState(); renderJournal(); });
     $(".remove-day", card).addEventListener("click", () => deleteDay(day));
     $$(".delete-row", card).forEach(button => button.addEventListener("click", () => {
-      if (day.exercises.length <= 5) return showToast("Tabela musi mieć co najmniej 5 wierszy");
-      day.exercises = day.exercises.filter(exercise => exercise.id !== button.closest("tr").dataset.exerciseId); saveState("Usunięto wiersz"); renderJournal();
+      day.exercises = day.exercises.filter(exercise => exercise.id !== button.closest("tr").dataset.exerciseId); saveState("Usunięto ćwiczenie"); renderJournal();
+    }));
+    $$(".delete-series", card).forEach(button => button.addEventListener("click", () => {
+      const setIndex = Number(button.dataset.set);
+      day.exercises.forEach(exercise => exercise.sets.splice(setIndex, 1));
+      day.seriesCount = Math.max(0, day.seriesCount - 1);
+      saveState("Usunięto serię"); renderJournal();
     }));
     $$(".effort-cycle", card).forEach(button => button.addEventListener("click", () => {
       const exercise = day.exercises.find(item => item.id === button.closest("tr").dataset.exerciseId);
