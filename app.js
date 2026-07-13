@@ -57,16 +57,25 @@ function bindStaticEvents() {
   $("#modal-cancel").addEventListener("click", closeModal);
   $("#modal-backdrop").addEventListener("click", event => { if (event.target === event.currentTarget) closeModal(); });
   $("#modal-form").addEventListener("submit", handleModalSubmit);
-  $("#mobile-menu").addEventListener("click", () => $(".sidebar").classList.toggle("open"));
-  document.addEventListener("keydown", event => { if (event.key === "Escape") closeModal(); });
+  $("#mobile-menu").addEventListener("click", () => setMobileMenu(!$(".sidebar").classList.contains("open")));
+  $("#mobile-close").addEventListener("click", () => setMobileMenu(false));
+  $("#sidebar-overlay").addEventListener("click", () => setMobileMenu(false));
+  document.addEventListener("keydown", event => { if (event.key === "Escape") { closeModal(); setMobileMenu(false); } });
   ["#date-from", "#date-to"].forEach(selector => $(selector).addEventListener("change", renderProgress));
+}
+
+function setMobileMenu(open) {
+  $(".sidebar").classList.toggle("open", open);
+  $("#sidebar-overlay").classList.toggle("open", open);
+  $("#mobile-menu").setAttribute("aria-expanded", String(open));
+  document.body.classList.toggle("menu-open", open);
 }
 
 function switchView(view) {
   activeView = view;
   $$(".nav-item").forEach(button => button.classList.toggle("active", button.dataset.view === view));
   $$(".view").forEach(section => section.classList.toggle("active", section.id === `${view}-view`));
-  $(".sidebar").classList.remove("open");
+  setMobileMenu(false);
   if (view === "progress") setupProgressFilters();
 }
 
