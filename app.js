@@ -24,7 +24,7 @@ function saveState(message) {
 }
 
 function emptyExercise(seriesCount = 3) {
-  return { id: uid(), name: "", sets: Array.from({ length: seriesCount }, () => ({ reps: "", weight: "" })) };
+  return { id: uid(), name: "", sets: Array.from({ length: seriesCount }, () => ({ reps: "", weight: "", effort: "" })) };
 }
 
 function newDay(date) {
@@ -59,7 +59,7 @@ function bindStaticEvents() {
   $("#modal-form").addEventListener("submit", handleModalSubmit);
   $("#mobile-menu").addEventListener("click", () => $(".sidebar").classList.toggle("open"));
   document.addEventListener("keydown", event => { if (event.key === "Escape") closeModal(); });
-  ["#progress-exercise", "#date-from", "#date-to", "#metric-select"].forEach(selector => $(selector).addEventListener("change", renderProgress));
+  ["#date-from", "#date-to"].forEach(selector => $(selector).addEventListener("change", renderProgress));
 }
 
 function switchView(view) {
@@ -110,6 +110,7 @@ function renderDayCard(day) {
     </div>
     <div class="workout-body">
       <table class="workout-table"><thead><tr><th>ĆWICZENIE</th>${seriesHeaders}<th></th></tr></thead><tbody>${day.exercises.map((exercise, row) => renderExerciseRow(exercise, row)).join("")}</tbody></table>
+      <div class="effort-help"><strong>Dotykaj „Oznacz”, aby zmieniać kolor:</strong><span><i class="effort-dot green"></i>duży zapas</span><span><i class="effort-dot orange"></i>mały zapas</span><span><i class="effort-dot red"></i>ledwo ukończona</span></div>
       <div class="table-actions"><button class="text-button add-exercise"><span>＋</span> Dodaj ćwiczenie</button><div><button class="text-button add-series"><span>＋</span> Dodaj serię</button><button class="text-button remove-day">Usuń dzień</button></div></div>
     </div>
   </article>`;
@@ -118,7 +119,7 @@ function renderDayCard(day) {
 function renderExerciseRow(exercise, row) {
   return `<tr data-exercise-id="${exercise.id}">
     <td><input class="exercise-input" data-field="name" value="${escapeHtml(exercise.name)}" placeholder="${row < 5 ? `Ćwiczenie ${row + 1}` : "Nazwa ćwiczenia"}" /></td>
-    ${exercise.sets.map((set, setIndex) => `<td><div class="set-pair"><input class="set-input" type="number" min="0" inputmode="numeric" data-set="${setIndex}" data-field="reps" value="${escapeHtml(set.reps)}" placeholder="powt." aria-label="Powtórzenia, seria ${setIndex + 1}"/><input class="set-input" type="number" min="0" step="0.5" inputmode="decimal" data-set="${setIndex}" data-field="weight" value="${escapeHtml(set.weight)}" placeholder="kg" aria-label="Ciężar, seria ${setIndex + 1}"/></div></td>`).join("")}
+    ${exercise.sets.map((set, setIndex) => `<td class="set-cell ${set.effort ? `effort-${set.effort}` : ""}"><div class="set-pair"><input class="set-input" type="number" min="0" inputmode="numeric" data-set="${setIndex}" data-field="reps" value="${escapeHtml(set.reps)}" placeholder="powt." aria-label="Powtórzenia, seria ${setIndex + 1}"/><input class="set-input" type="number" min="0" step="0.5" inputmode="decimal" data-set="${setIndex}" data-field="weight" value="${escapeHtml(set.weight)}" placeholder="kg" aria-label="Ciężar, seria ${setIndex + 1}"/></div><div class="effort-picker"><button class="effort-cycle ${set.effort || "empty"}" data-set="${setIndex}" type="button" title="Dotknij, aby zmienić odczucie" aria-label="Seria ${setIndex + 1}: ${effortName(set.effort)}. Dotknij, aby zmienić"><i></i><span>${effortShortName(set.effort)}</span></button></div></td>`).join("")}
     <td><button class="delete-row" aria-label="Usuń ćwiczenie" title="Usuń wiersz">×</button></td>
   </tr>`;
 }
@@ -133,11 +134,18 @@ function bindJournalEvents() {
     $(".day-header", card).addEventListener("click", () => { day.collapsed = !day.collapsed; saveState(); card.classList.toggle("collapsed"); });
     $$("input", card).forEach(input => input.addEventListener("input", () => updateWorkoutInput(day, input)));
     $(".add-exercise", card).addEventListener("click", () => { day.exercises.push(emptyExercise(day.seriesCount)); saveState(); renderJournal(); });
-    $(".add-series", card).addEventListener("click", () => { day.seriesCount++; day.exercises.forEach(exercise => exercise.sets.push({ reps: "", weight: "" })); saveState(); renderJournal(); });
+    $(".add-series", card).addEventListener("click", () => { day.seriesCount++; day.exercises.forEach(exercise => exercise.sets.push({ reps: "", weight: "", effort: "" })); saveState(); renderJournal(); });
     $(".remove-day", card).addEventListener("click", () => deleteDay(day));
     $$(".delete-row", card).forEach(button => button.addEventListener("click", () => {
       if (day.exercises.length <= 5) return showToast("Tabela musi mieć co najmniej 5 wierszy");
       day.exercises = day.exercises.filter(exercise => exercise.id !== button.closest("tr").dataset.exerciseId); saveState("Usunięto wiersz"); renderJournal();
+    }));
+    $$(".effort-cycle", card).forEach(button => button.addEventListener("click", () => {
+      const exercise = day.exercises.find(item => item.id === button.closest("tr").dataset.exerciseId);
+      const set = exercise.sets[Number(button.dataset.set)];
+      const cycle = ["", "green", "orange", "red"];
+      set.effort = cycle[(cycle.indexOf(set.effort || "") + 1) % cycle.length];
+      saveState("Zapisano odczucie po serii"); renderJournal();
     }));
   });
 }
@@ -198,10 +206,6 @@ function allWorkoutEntries() {
 
 function setupProgressFilters() {
   const entries = allWorkoutEntries();
-  const names = [...new Set(entries.map(entry => entry.name))].sort((a, b) => a.localeCompare(b, "pl"));
-  const select = $("#progress-exercise"); const previous = select.value;
-  select.innerHTML = `<option value="all">Wszystkie ćwiczenia</option>${names.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}`;
-  if (names.includes(previous)) select.value = previous;
   const dates = entries.map(entry => entry.date).sort();
   if (!$("#date-from").value) $("#date-from").value = dates[0] || "";
   if (!$("#date-to").value) $("#date-to").value = dates.at(-1) || localIsoDate();
@@ -209,8 +213,8 @@ function setupProgressFilters() {
 }
 
 function filteredEntries() {
-  const exercise = $("#progress-exercise").value, from = $("#date-from").value, to = $("#date-to").value;
-  return allWorkoutEntries().filter(entry => (exercise === "all" || entry.name === exercise) && (!from || entry.date >= from) && (!to || entry.date <= to)).sort((a, b) => a.date.localeCompare(b.date));
+  const from = $("#date-from").value, to = $("#date-to").value;
+  return allWorkoutEntries().filter(entry => (!from || entry.date >= from) && (!to || entry.date <= to)).sort((a, b) => a.date.localeCompare(b.date));
 }
 
 function entryMetrics(entry) {
@@ -225,11 +229,8 @@ function entryMetrics(entry) {
 
 function renderProgress() {
   const entries = filteredEntries();
-  const metric = $("#metric-select").value;
-  const metricNames = { weight: "Maksymalny ciężar", volume: "Objętość treningowa", sets: "Liczba serii", reps: "Liczba powtórzeń" };
-  $("#chart-title").textContent = metricNames[metric];
   renderStats(entries);
-  renderChart(entries, metric);
+  renderExerciseProgress(entries);
   renderInsights(entries);
   renderRecent(entries);
 }
@@ -262,23 +263,52 @@ function aggregateByDate(entries, metric) {
   }));
 }
 
-function renderChart(entries, metric) {
-  const points = aggregateByDate(entries, metric);
-  const container = $("#chart-container"), change = $("#chart-change");
-  if (!points.length) { container.innerHTML = `<div class="no-chart"><div>Brak danych dla wybranego zakresu.<br>Uzupełnij treningi w dzienniku.</div></div>`; change.textContent = "Brak danych"; change.className = "change-pill"; return; }
-  const first = points[0].value, last = points.at(-1).value;
-  const delta = first ? ((last - first) / first) * 100 : 0;
-  change.textContent = `${delta >= 0 ? "+" : ""}${delta.toFixed(0)}% w zakresie`; change.className = `change-pill ${delta < 0 ? "negative" : ""}`;
+function renderExerciseProgress(entries) {
+  const container = $("#exercise-progress-list");
+  const groups = new Map();
+  entries.forEach(entry => {
+    const key = entry.name.toLocaleLowerCase("pl-PL");
+    if (!groups.has(key)) groups.set(key, { name: entry.name, entries: [] });
+    groups.get(key).entries.push(entry);
+  });
+  const exercises = [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, "pl"));
+  if (!exercises.length) {
+    container.innerHTML = `<article class="chart-card empty-progress"><div class="no-chart"><div>Brak danych dla wybranego zakresu.<br>Uzupełnij ćwiczenia, serie i ciężary w dzienniku.</div></div></article>`;
+    return;
+  }
+  container.innerHTML = exercises.map((exercise, index) => {
+    const weightPoints = aggregateByDate(exercise.entries, "weight");
+    const setPoints = aggregateByDate(exercise.entries, "sets");
+    const weightChange = metricChange(weightPoints, "kg");
+    const setChange = metricChange(setPoints, "ser.");
+    return `<article class="exercise-progress-card">
+      <div class="exercise-progress-header"><div><span class="exercise-index">${String(index + 1).padStart(2, "0")}</span><div><span class="card-kicker">PROGRES ĆWICZENIA</span><h2>${escapeHtml(exercise.name)}</h2></div></div><span class="entry-count">${exercise.entries.length} ${plural(exercise.entries.length, "wpis", "wpisy", "wpisów")}</span></div>
+      <div class="exercise-charts">
+        <section class="metric-chart"><div class="metric-chart-header"><div><span class="metric-mark weight"></span><strong>Maksymalny ciężar</strong><small>największy ciężar użyty danego dnia</small></div><span class="change-pill ${weightChange.negative ? "negative" : ""}">${weightChange.label}</span></div><div class="chart-container mini-chart">${buildChartSvg(weightPoints, "kg", `Ciężar dla ${exercise.name}`, "weight")}</div></section>
+        <section class="metric-chart"><div class="metric-chart-header"><div><span class="metric-mark sets"></span><strong>Wykonane serie</strong><small>liczba uzupełnionych serii danego dnia</small></div><span class="change-pill ${setChange.negative ? "negative" : ""}">${setChange.label}</span></div><div class="chart-container mini-chart">${buildChartSvg(setPoints, "ser.", `Serie dla ${exercise.name}`, "sets")}</div></section>
+      </div>
+    </article>`;
+  }).join("");
+}
 
-  const width = 900, height = 270, left = 52, right = 22, top = 24, bottom = 38;
-  const max = Math.max(...points.map(point => point.value), 1) * 1.15;
+function metricChange(points, unit) {
+  if (!points.length) return { label: "Brak danych", negative: false };
+  const difference = points.at(-1).value - points[0].value;
+  return { label: `${difference > 0 ? "+" : ""}${formatNumber(difference)} ${unit}`, negative: difference < 0 };
+}
+
+function buildChartSvg(points, unit, ariaLabel, variant) {
+  if (!points.length || points.every(point => point.value === 0)) return `<div class="no-chart"><div>Brak uzupełnionych danych</div></div>`;
+  const width = 520, height = 230, left = 45, right = 18, top = 27, bottom = 38;
+  const max = Math.max(...points.map(point => point.value), 1) * 1.18;
   const x = index => left + (points.length === 1 ? (width - left - right) / 2 : index * (width - left - right) / (points.length - 1));
   const y = value => top + (max - value) * (height - top - bottom) / max;
   const path = points.map((point, index) => `${index ? "L" : "M"}${x(index).toFixed(1)},${y(point.value).toFixed(1)}`).join(" ");
   const area = `${path} L${x(points.length - 1)},${height - bottom} L${x(0)},${height - bottom} Z`;
-  const yLines = Array.from({ length: 5 }, (_, index) => { const value = max * (4 - index) / 4, yy = y(value); return `<line class="grid-line" x1="${left}" y1="${yy}" x2="${width-right}" y2="${yy}"/><text class="axis-label" x="${left-8}" y="${yy+3}" text-anchor="end">${formatCompact(value)}</text>`; }).join("");
-  const labelEvery = Math.max(1, Math.ceil(points.length / 7));
-  container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="Wykres progresu"><defs><linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4c9675" stop-opacity=".24"/><stop offset="1" stop-color="#4c9675" stop-opacity="0"/></linearGradient></defs>${yLines}<path class="chart-area" d="${area}"/><path class="chart-line" d="${path}"/>${points.map((point,index) => `<circle class="chart-dot" cx="${x(index)}" cy="${y(point.value)}" r="4"/><text class="chart-value" x="${x(index)}" y="${y(point.value)-10}" text-anchor="middle">${formatCompact(point.value)}</text>${(index % labelEvery === 0 || index === points.length - 1) ? `<text class="axis-label" x="${x(index)}" y="${height-15}" text-anchor="middle">${formatDate(point.date, { day: "2-digit", month: "short" })}</text>` : ""}`).join("")}</svg>`;
+  const grid = Array.from({ length: 4 }, (_, index) => { const value = max * (3 - index) / 3, yy = y(value); return `<line class="grid-line" x1="${left}" y1="${yy}" x2="${width-right}" y2="${yy}"/><text class="axis-label" x="${left-7}" y="${yy+3}" text-anchor="end">${formatCompact(value)}</text>`; }).join("");
+  const labelEvery = Math.max(1, Math.ceil(points.length / 5));
+  const gradientId = `gradient-${variant}-${uid()}`;
+  return `<svg class="${variant}-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(ariaLabel)}"><defs><linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-opacity=".22"/><stop offset="1" stop-opacity="0"/></linearGradient></defs>${grid}<path class="chart-area" style="fill:url(#${gradientId})" d="${area}"/><path class="chart-line" d="${path}"/>${points.map((point,index) => `<circle class="chart-dot" cx="${x(index)}" cy="${y(point.value)}" r="4"/><text class="chart-value" x="${x(index)}" y="${y(point.value)-9}" text-anchor="middle">${formatNumber(point.value)} ${unit}</text>${(index % labelEvery === 0 || index === points.length - 1) ? `<text class="axis-label" x="${x(index)}" y="${height-15}" text-anchor="middle">${formatDate(point.date, { day: "2-digit", month: "short" })}</text>` : ""}`).join("")}</svg>`;
 }
 
 function renderInsights(entries) {
@@ -300,6 +330,8 @@ function renderRecent(entries) {
 }
 
 function plural(number, one, few, many) { if (number === 1) return one; if (number % 10 >= 2 && number % 10 <= 4 && (number % 100 < 10 || number % 100 >= 20)) return few; return many; }
+function effortName(effort) { return ({ green: "duży zapas", orange: "mały zapas", red: "ledwo ukończona" })[effort] || "bez oznaczenia"; }
+function effortShortName(effort) { return ({ green: "Zapas", orange: "Trochę", red: "Granica" })[effort] || "Oznacz"; }
 function formatNumber(value) { return Number(value || 0).toLocaleString("pl-PL", { maximumFractionDigits: 1 }); }
 function formatCompact(value) { return Intl.NumberFormat("pl-PL", { notation: value >= 10000 ? "compact" : "standard", maximumFractionDigits: 1 }).format(value || 0); }
 function showToast(message) { const toast = $("#toast"); toast.textContent = message; toast.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove("show"), 2200); }

@@ -76,29 +76,17 @@
             </div>
           </div>
 
-          <div class="filter-card">
-            <label>Ćwiczenie<select id="progress-exercise"></select></label>
+          <div class="filter-card progress-filters">
             <label>Od<input type="date" id="date-from" /></label>
             <label>Do<input type="date" id="date-to" /></label>
-            <label>Wskaźnik
-              <select id="metric-select">
-                <option value="weight">Maksymalny ciężar</option>
-                <option value="volume">Objętość treningowa</option>
-                <option value="sets">Liczba serii</option>
-                <option value="reps">Liczba powtórzeń</option>
-              </select>
-            </label>
+            <div class="effort-legend" aria-label="Legenda poziomu wysiłku">
+              <span class="filter-label">ODCZUCIE PO SERII</span>
+              <div><span><i class="effort-dot green"></i>Duży zapas</span><span><i class="effort-dot orange"></i>Mały zapas</span><span><i class="effort-dot red"></i>Ledwo ukończona</span></div>
+            </div>
           </div>
 
           <div id="stats-grid" class="stats-grid"></div>
-
-          <article class="chart-card">
-            <div class="chart-header">
-              <div><span class="card-kicker">TREND W CZASIE</span><h2 id="chart-title">Maksymalny ciężar</h2></div>
-              <span id="chart-change" class="change-pill"></span>
-            </div>
-            <div id="chart-container" class="chart-container"></div>
-          </article>
+          <div id="exercise-progress-list" class="exercise-progress-list"></div>
 
           <div class="progress-bottom">
             <article class="insight-card" id="insight-card"></article>
