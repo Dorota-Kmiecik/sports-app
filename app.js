@@ -4,6 +4,7 @@ const state = loadState();
 let activeView = "journal";
 let modalMode = "month";
 let toastTimer;
+let confirmationAction = null;
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -57,10 +58,14 @@ function bindStaticEvents() {
   $("#modal-cancel").addEventListener("click", closeModal);
   $("#modal-backdrop").addEventListener("click", event => { if (event.target === event.currentTarget) closeModal(); });
   $("#modal-form").addEventListener("submit", handleModalSubmit);
+  $("#confirmation-close").addEventListener("click", closeConfirmation);
+  $("#confirmation-cancel").addEventListener("click", closeConfirmation);
+  $("#confirmation-backdrop").addEventListener("click", event => { if (event.target === event.currentTarget) closeConfirmation(); });
+  $("#confirmation-submit").addEventListener("click", confirmCurrentAction);
   $("#mobile-menu").addEventListener("click", () => setMobileMenu(!$(".sidebar").classList.contains("open")));
   $("#mobile-close").addEventListener("click", () => setMobileMenu(false));
   $("#sidebar-overlay").addEventListener("click", () => setMobileMenu(false));
-  document.addEventListener("keydown", event => { if (event.key === "Escape") { closeModal(); setMobileMenu(false); } });
+  document.addEventListener("keydown", event => { if (event.key === "Escape") { if ($("#confirmation-backdrop").classList.contains("open")) closeConfirmation(); else closeModal(); setMobileMenu(false); } });
   ["#date-from", "#date-to"].forEach(selector => $(selector).addEventListener("change", renderProgress));
 }
 
@@ -188,6 +193,39 @@ function openModal(mode) {
 
 function closeModal() { $("#modal-backdrop").classList.remove("open"); $("#modal-backdrop").setAttribute("aria-hidden", "true"); }
 
+function openConfirmation({ title, description, confirmLabel, danger = true, onConfirm }) {
+  confirmationAction = onConfirm;
+  $("#confirmation-title").textContent = title;
+  $("#confirmation-description").textContent = description;
+  $("#confirmation-submit-label").textContent = confirmLabel;
+  $("#confirmation-submit").classList.toggle("danger", danger);
+  $("#confirmation-submit-icon").classList.toggle("hidden", !danger);
+  $("#confirmation-backdrop").classList.add("open");
+  $("#confirmation-backdrop").setAttribute("aria-hidden", "false");
+  setTimeout(() => $("#confirmation-submit").focus(), 30);
+}
+
+function closeConfirmation() {
+  confirmationAction = null;
+  $("#confirmation-backdrop").classList.remove("open");
+  $("#confirmation-backdrop").setAttribute("aria-hidden", "true");
+}
+
+function confirmCurrentAction() {
+  const action = confirmationAction;
+  closeConfirmation();
+  action?.();
+}
+
+function addWorkoutDay(date, note) {
+  const day = newDay(date);
+  day.note = note;
+  activeMonth().days.push(day);
+  saveState("Dodano dzień treningowy");
+  closeModal();
+  renderJournal();
+}
+
 function handleModalSubmit(event) {
   event.preventDefault();
   const value = $("#modal-input").value.trim();
@@ -196,21 +234,48 @@ function handleModalSubmit(event) {
   } else if (modalMode === "rename") { activeMonth().name = value; saveState("Nazwa została zmieniona"); }
   else {
     const date = $("#modal-date").value;
-    if (activeMonth().days.some(day => day.date === date) && !confirm("W tym dniu istnieje już trening. Dodać kolejny?")) return;
-    const day = newDay(date); day.note = value; activeMonth().days.push(day); saveState("Dodano dzień treningowy");
+    if (activeMonth().days.some(day => day.date === date)) {
+      openConfirmation({
+        title: "Dodać kolejny trening?",
+        description: "W tym dniu istnieje już trening. Możesz dodać drugi wpis dla tej samej daty.",
+        confirmLabel: "Dodaj trening",
+        danger: false,
+        onConfirm: () => addWorkoutDay(date, value)
+      });
+      return;
+    }
+    addWorkoutDay(date, value);
+    return;
   }
   closeModal(); renderJournal();
 }
 
 function deleteMonth() {
   const month = activeMonth();
-  if (!confirm(`Usunąć folder „${month.name}” i wszystkie jego treningi?`)) return;
-  state.months = state.months.filter(item => item.id !== month.id); state.activeMonthId = state.months[0]?.id || null; saveState("Usunięto miesiąc"); renderJournal();
+  openConfirmation({
+    title: "Usunąć folder?",
+    description: `Folder „${month.name}” oraz wszystkie znajdujące się w nim treningi zostaną usunięte.`,
+    confirmLabel: "Usuń folder",
+    onConfirm: () => {
+      state.months = state.months.filter(item => item.id !== month.id);
+      state.activeMonthId = state.months[0]?.id || null;
+      saveState("Usunięto miesiąc");
+      renderJournal();
+    }
+  });
 }
 
 function deleteDay(day) {
-  if (!confirm(`Usunąć trening z ${formatDate(day.date, { day: "numeric", month: "long" })}?`)) return;
-  activeMonth().days = activeMonth().days.filter(item => item.id !== day.id); saveState("Usunięto dzień"); renderJournal();
+  openConfirmation({
+    title: "Usunąć dzień?",
+    description: `Trening z ${formatDate(day.date, { day: "numeric", month: "long" })} oraz wszystkie ćwiczenia i serie zostaną usunięte.`,
+    confirmLabel: "Usuń dzień",
+    onConfirm: () => {
+      activeMonth().days = activeMonth().days.filter(item => item.id !== day.id);
+      saveState("Usunięto dzień");
+      renderJournal();
+    }
+  });
 }
 
 function allWorkoutEntries() {
