@@ -1,4 +1,4 @@
-# Forma — dziennik treningowy
+# Forma — dziennik treningowy  https://dorota-kmiecik.github.io/sports-app/
 
 Prosta aplikacja do zapisywania ćwiczeń, serii, powtórzeń i ciężaru oraz obserwowania progresu w czasie.
 
