@@ -118,7 +118,7 @@ function renderDayCard(day) {
       <div class="day-meta"><span class="exercise-count">${filledCount} ${plural(filledCount, "ćwiczenie", "ćwiczenia", "ćwiczeń")}</span><svg class="chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></div>
     </div>
     <div class="workout-body">
-      <table class="workout-table"><thead><tr><th>ĆWICZENIE</th>${seriesHeaders}<th></th></tr></thead><tbody>${day.exercises.map((exercise, row) => renderExerciseRow(exercise, row)).join("")}</tbody></table>
+      <table class="workout-table"><thead><tr><th>ĆWICZENIE</th>${seriesHeaders}</tr></thead><tbody>${day.exercises.map((exercise, row) => renderExerciseRow(exercise, row)).join("")}</tbody></table>
       <div class="effort-help"><strong>Dotykaj „Oznacz”, aby zmieniać kolor:</strong><span><i class="effort-dot green"></i>duży zapas</span><span><i class="effort-dot orange"></i>mały zapas</span><span><i class="effort-dot red"></i>ledwo ukończona</span></div>
       <div class="table-actions"><button class="text-button add-exercise"><span>＋</span> Dodaj ćwiczenie</button><div><button class="text-button add-series"><span>＋</span> Dodaj serię</button><button class="text-button remove-day">Usuń dzień</button></div></div>
     </div>
@@ -127,9 +127,8 @@ function renderDayCard(day) {
 
 function renderExerciseRow(exercise, row) {
   return `<tr data-exercise-id="${exercise.id}">
-    <td><input class="exercise-input" data-field="name" value="${escapeHtml(exercise.name)}" placeholder="${row < 5 ? `Ćwiczenie ${row + 1}` : "Nazwa ćwiczenia"}" /></td>
+    <td><div class="exercise-cell"><button class="delete-row" type="button" aria-label="Usuń ćwiczenie" title="Usuń ćwiczenie">×</button><input class="exercise-input" data-field="name" value="${escapeHtml(exercise.name)}" placeholder="${row < 5 ? `Ćwiczenie ${row + 1}` : "Nazwa ćwiczenia"}" /></div></td>
     ${exercise.sets.map((set, setIndex) => `<td class="set-cell ${set.effort ? `effort-${set.effort}` : ""}"><div class="set-pair"><input class="set-input" type="number" min="0" inputmode="numeric" data-set="${setIndex}" data-field="reps" value="${escapeHtml(set.reps)}" placeholder="powt." aria-label="Powtórzenia, seria ${setIndex + 1}"/><input class="set-input" type="number" min="0" step="0.5" inputmode="decimal" data-set="${setIndex}" data-field="weight" value="${escapeHtml(set.weight)}" placeholder="kg" aria-label="Ciężar, seria ${setIndex + 1}"/></div><div class="effort-picker"><button class="effort-cycle ${set.effort || "empty"}" data-set="${setIndex}" type="button" title="Dotknij, aby zmienić odczucie" aria-label="Seria ${setIndex + 1}: ${effortName(set.effort)}. Dotknij, aby zmienić"><i></i><span>${effortShortName(set.effort)}</span></button></div></td>`).join("")}
-    <td><button class="delete-row" type="button" aria-label="Usuń ćwiczenie" title="Usuń ćwiczenie">×</button></td>
   </tr>`;
 }
 
