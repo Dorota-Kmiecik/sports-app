@@ -6,6 +6,10 @@ Prosta aplikacja do zapisywania ćwiczeń, serii, powtórzeń i ciężaru oraz o
 
 Otwórz plik `index.html` w przeglądarce. Nie trzeba instalować żadnych zależności ani uruchamiać serwera.
 
+### Android
+
+Otwórz cały folder projektu w Android Studio. Moduł `app` automatycznie kopiuje aktualne pliki `index.html`, `styles.css` i `app.js` do aplikacji podczas każdego budowania.
+
 ## Dane
 
 Wpisy są automatycznie zapisywane w pamięci lokalnej przeglądarki (`localStorage`). Są dostępne na tym samym urządzeniu i w tej samej przeglądarce. Wyczyszczenie danych witryny usunie również dziennik.
