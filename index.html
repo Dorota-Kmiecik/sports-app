@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f1eb" />
+    <title>Forma — dziennik treningowy</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#" aria-label="Forma — strona główna">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>forma</span>
+        </a>
+
+        <nav class="main-nav" aria-label="Główna nawigacja">
+          <button class="nav-item active" data-view="journal">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5v-16Z"/><path d="M4 18.5A2.5 2.5 0 0 1 6.5 16H20M8 7h7M8 11h5"/></svg>
+            Dziennik
+          </button>
+          <button class="nav-item" data-view="progress">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 19V5M4 19h16"/><path d="m7 15 4-4 3 2 5-6"/></svg>
+            Progres
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <p>TWÓJ PLAN</p>
+          <div class="plan-card">
+            <span class="plan-icon"><svg viewBox="0 0 24 24"><path d="m7 8 5-5 5 5M12 3v14M5 21h14"/></svg></span>
+            <div><strong>Buduj regularność</strong><small>Każdy trening się liczy</small></div>
+          </div>
+        </div>
+      </aside>
+
+      <main>
+        <header class="topbar">
+          <button id="mobile-menu" class="icon-button mobile-menu" aria-label="Otwórz menu">
+            <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </button>
+          <div class="top-date" id="today-label"></div>
+          <div class="profile">
+            <span class="avatar">D</span>
+            <div><strong>Twój dziennik</strong><small>Dane zapisane lokalnie</small></div>
+          </div>
+        </header>
+
+        <section id="journal-view" class="view active">
+          <div class="page-heading">
+            <div>
+              <span class="eyebrow">DZIENNIK TRENINGOWY</span>
+              <h1>Twoje treningi</h1>
+              <p>Małe kroki. Mierzalny progres.</p>
+            </div>
+            <button class="primary-button" id="add-month">
+              <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+              Nowy miesiąc
+            </button>
+          </div>
+
+          <div id="month-tabs" class="month-tabs" role="tablist"></div>
+          <div id="journal-content"></div>
+        </section>
+
+        <section id="progress-view" class="view">
+          <div class="page-heading progress-heading">
+            <div>
+              <span class="eyebrow">ANALIZA WYNIKÓW</span>
+              <h1>Twój progres</h1>
+              <p>Zobacz, jak konsekwencja zamienia się w wyniki.</p>
+            </div>
+          </div>
+
+          <div class="filter-card">
+            <label>Ćwiczenie<select id="progress-exercise"></select></label>
+            <label>Od<input type="date" id="date-from" /></label>
+            <label>Do<input type="date" id="date-to" /></label>
+            <label>Wskaźnik
+              <select id="metric-select">
+                <option value="weight">Maksymalny ciężar</option>
+                <option value="volume">Objętość treningowa</option>
+                <option value="sets">Liczba serii</option>
+                <option value="reps">Liczba powtórzeń</option>
+              </select>
+            </label>
+          </div>
+
+          <div id="stats-grid" class="stats-grid"></div>
+
+          <article class="chart-card">
+            <div class="chart-header">
+              <div><span class="card-kicker">TREND W CZASIE</span><h2 id="chart-title">Maksymalny ciężar</h2></div>
+              <span id="chart-change" class="change-pill"></span>
+            </div>
+            <div id="chart-container" class="chart-container"></div>
+          </article>
+
+          <div class="progress-bottom">
+            <article class="insight-card" id="insight-card"></article>
+            <article class="recent-card">
+              <div class="card-title-row"><div><span class="card-kicker">OSTATNIE WPISY</span><h2>Historia treningów</h2></div></div>
+              <div id="recent-list"></div>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="modal-backdrop" id="modal-backdrop" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <button class="modal-close" id="modal-close" aria-label="Zamknij">×</button>
+        <span class="modal-symbol" id="modal-symbol">＋</span>
+        <h2 id="modal-title">Nowy miesiąc</h2>
+        <p id="modal-description">Nadaj nazwę folderowi, np. „Lipiec 2026”.</p>
+        <form id="modal-form">
+          <label id="modal-label">Nazwa miesiąca<input id="modal-input" type="text" autocomplete="off" required /></label>
+          <label id="modal-date-label" class="hidden">Data treningu<input id="modal-date" type="date" /></label>
+          <div class="modal-actions">
+            <button type="button" class="secondary-button" id="modal-cancel">Anuluj</button>
+            <button type="submit" class="primary-button" id="modal-submit">Dodaj miesiąc</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" role="status"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
