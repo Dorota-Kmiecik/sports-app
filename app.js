@@ -3,6 +3,7 @@ const STORAGE_KEY = "forma-workout-journal-v1";
 const state = loadState();
 let activeView = "journal";
 let modalMode = "month";
+let dayToCopy = null;
 let toastTimer;
 let confirmationAction = null;
 
@@ -125,7 +126,7 @@ function renderDayCard(day) {
     <div class="workout-body">
       <table class="workout-table"><thead><tr><th>ĆWICZENIE</th>${seriesHeaders}</tr></thead><tbody>${day.exercises.map((exercise, row) => renderExerciseRow(exercise, row)).join("")}</tbody></table>
       <div class="effort-help"><strong>Dotykaj „Oznacz”, aby zmieniać kolor:</strong><span><i class="effort-dot green"></i>duży zapas</span><span><i class="effort-dot orange"></i>mały zapas</span><span><i class="effort-dot red"></i>ledwo ukończona</span></div>
-      <div class="table-actions"><button class="text-button add-exercise"><span>＋</span> Dodaj ćwiczenie</button><div><button class="text-button add-series"><span>＋</span> Dodaj serię</button><button class="text-button remove-day">Usuń dzień</button></div></div>
+      <div class="table-actions"><button class="text-button add-exercise"><span>＋</span> Dodaj ćwiczenie</button><div><button class="text-button copy-day"><span>⧉</span> Kopiuj dzień</button><button class="text-button add-series"><span>＋</span> Dodaj serię</button><button class="text-button remove-day">Usuń dzień</button></div></div>
     </div>
   </article>`;
 }
@@ -148,6 +149,7 @@ function bindJournalEvents() {
     $$("input", card).forEach(input => input.addEventListener("input", () => updateWorkoutInput(day, input)));
     $(".add-exercise", card).addEventListener("click", () => { day.exercises.push(emptyExercise(day.seriesCount)); saveState(); renderJournal(); });
     $(".add-series", card).addEventListener("click", () => { day.seriesCount++; day.exercises.forEach(exercise => exercise.sets.push({ reps: "", weight: "", effort: "" })); saveState(); renderJournal(); });
+    $(".copy-day", card).addEventListener("click", () => openCopyDayModal(day));
     $(".remove-day", card).addEventListener("click", () => deleteDay(day));
     $$(".delete-row", card).forEach(button => button.addEventListener("click", () => {
       day.exercises = day.exercises.filter(exercise => exercise.id !== button.closest("tr").dataset.exerciseId); saveState("Usunięto ćwiczenie"); renderJournal();
@@ -163,7 +165,13 @@ function bindJournalEvents() {
       const set = exercise.sets[Number(button.dataset.set)];
       const cycle = ["", "green", "orange", "red"];
       set.effort = cycle[(cycle.indexOf(set.effort || "") + 1) % cycle.length];
-      saveState("Zapisano odczucie po serii"); renderJournal();
+      saveState("Zapisano odczucie po serii");
+      const cell = button.closest(".set-cell");
+      cell.classList.remove("effort-green", "effort-orange", "effort-red");
+      if (set.effort) cell.classList.add(`effort-${set.effort}`);
+      button.className = `effort-cycle ${set.effort || "empty"}`;
+      $("span", button).textContent = effortShortName(set.effort);
+      button.setAttribute("aria-label", `Seria ${Number(button.dataset.set) + 1}: ${effortName(set.effort)}. Dotknij, aby zmienić`);
     }));
   });
 }
@@ -191,7 +199,23 @@ function openModal(mode) {
   setTimeout(() => (mode === "day" ? $("#modal-date") : $("#modal-input")).focus(), 30);
 }
 
-function closeModal() { $("#modal-backdrop").classList.remove("open"); $("#modal-backdrop").setAttribute("aria-hidden", "true"); }
+function openCopyDayModal(day) {
+  dayToCopy = day;
+  modalMode = "copy-day";
+  $("#modal-title").textContent = "Kopiuj dzień treningowy";
+  $("#modal-description").textContent = "Skopiujemy nazwy ćwiczeń i ciężary. Powtórzenia oraz oznaczenia kolorami pozostaną puste.";
+  $("#modal-label").classList.add("hidden");
+  $("#modal-input").required = false;
+  $("#modal-date-label").classList.remove("hidden");
+  $("#modal-date").required = true;
+  $("#modal-date").value = localIsoDate();
+  $("#modal-submit").textContent = "Kopiuj dzień";
+  $("#modal-backdrop").classList.add("open");
+  $("#modal-backdrop").setAttribute("aria-hidden", "false");
+  setTimeout(() => $("#modal-date").focus(), 30);
+}
+
+function closeModal() { $("#modal-backdrop").classList.remove("open"); $("#modal-backdrop").setAttribute("aria-hidden", "true"); $("#modal-label").classList.remove("hidden"); dayToCopy = null; }
 
 function openConfirmation({ title, description, confirmLabel, danger = true, onConfirm }) {
   confirmationAction = onConfirm;
@@ -229,6 +253,16 @@ function addWorkoutDay(date, note) {
 function handleModalSubmit(event) {
   event.preventDefault();
   const value = $("#modal-input").value.trim();
+  if (modalMode === "copy-day") {
+    const copy = {
+      id: uid(), date: $("#modal-date").value, seriesCount: dayToCopy.seriesCount, collapsed: false,
+      note: dayToCopy.note || "",
+      exercises: dayToCopy.exercises.map(exercise => ({ id: uid(), name: exercise.name, sets: exercise.sets.map(set => ({ reps: "", weight: set.weight, effort: "" })) }))
+    };
+    activeMonth().days.push(copy);
+    saveState("Skopiowano dzień bez powtórzeń");
+    closeModal(); renderJournal(); return;
+  }
   if (modalMode === "month") {
     const month = { id: uid(), name: value, days: [] }; state.months.push(month); state.activeMonthId = month.id; saveState("Utworzono nowy miesiąc");
   } else if (modalMode === "rename") { activeMonth().name = value; saveState("Nazwa została zmieniona"); }
@@ -307,25 +341,8 @@ function entryMetrics(entry) {
 
 function renderProgress() {
   const entries = filteredEntries();
-  renderStats(entries);
   renderExerciseProgress(entries);
-  renderInsights(entries);
   renderRecent(entries);
-}
-
-function renderStats(entries) {
-  const uniqueDates = new Set(entries.map(entry => entry.date)).size;
-  const metrics = entries.map(entryMetrics);
-  const totalSets = metrics.reduce((sum, item) => sum + item.sets, 0);
-  const totalVolume = metrics.reduce((sum, item) => sum + item.volume, 0);
-  const maxWeight = Math.max(0, ...metrics.map(item => item.weight));
-  const cards = [
-    ["Treningi", uniqueDates, "dni z aktywnością", "M4 19V5M4 19h16M7 14l3-3 3 2 6-7"],
-    ["Wykonane serie", totalSets, "łącznie w zakresie", "M5 7h14M5 12h14M5 17h9"],
-    ["Największy ciężar", `${formatNumber(maxWeight)} kg`, "rekord w zakresie", "M7 8 12 3l5 5M12 3v14M5 21h14"],
-    ["Objętość", `${formatCompact(totalVolume)} kg`, "ciężar × powtórzenia", "M4 17 9 8 4 3 7-6"]
-  ];
-  $("#stats-grid").innerHTML = cards.map(card => `<article class="stat-card"><div class="stat-label"><span>${card[0]}</span><span class="stat-icon"><svg viewBox="0 0 24 24"><path d="${card[3]}"/></svg></span></div><div class="stat-value">${card[1]}</div><div class="stat-detail">${card[2]}</div></article>`).join("");
 }
 
 function aggregateByDate(entries, metric) {
@@ -356,17 +373,40 @@ function renderExerciseProgress(entries) {
   }
   container.innerHTML = exercises.map((exercise, index) => {
     const weightPoints = aggregateByDate(exercise.entries, "weight");
-    const setPoints = aggregateByDate(exercise.entries, "sets");
+    const repPoints = aggregateByDate(exercise.entries, "reps");
     const weightChange = metricChange(weightPoints, "kg");
-    const setChange = metricChange(setPoints, "ser.");
+    const repChange = metricChange(repPoints, "powt.");
+    const recommendation = exerciseRecommendation(exercise.entries);
     return `<article class="exercise-progress-card">
       <div class="exercise-progress-header"><div><span class="exercise-index">${String(index + 1).padStart(2, "0")}</span><div><span class="card-kicker">PROGRES ĆWICZENIA</span><h2>${escapeHtml(exercise.name)}</h2></div></div><span class="entry-count">${exercise.entries.length} ${plural(exercise.entries.length, "wpis", "wpisy", "wpisów")}</span></div>
       <div class="exercise-charts">
         <section class="metric-chart"><div class="metric-chart-header"><div><span class="metric-mark weight"></span><strong>Maksymalny ciężar</strong><small>największy ciężar użyty danego dnia</small></div><span class="change-pill ${weightChange.negative ? "negative" : ""}">${weightChange.label}</span></div><div class="chart-container mini-chart">${buildChartSvg(weightPoints, "kg", `Ciężar dla ${exercise.name}`, "weight")}</div></section>
-        <section class="metric-chart"><div class="metric-chart-header"><div><span class="metric-mark sets"></span><strong>Wykonane serie</strong><small>liczba uzupełnionych serii danego dnia</small></div><span class="change-pill ${setChange.negative ? "negative" : ""}">${setChange.label}</span></div><div class="chart-container mini-chart">${buildChartSvg(setPoints, "ser.", `Serie dla ${exercise.name}`, "sets")}</div></section>
+        <section class="metric-chart"><div class="metric-chart-header"><div><span class="metric-mark sets"></span><strong>Łączna liczba powtórzeń</strong><small>powtórzenia w tym ćwiczeniu danego dnia</small></div><span class="change-pill ${repChange.negative ? "negative" : ""}">${repChange.label}</span></div><div class="chart-container mini-chart">${buildChartSvg(repPoints, "powt.", `Powtórzenia dla ${exercise.name}`, "sets")}</div></section>
       </div>
+      <div class="exercise-recommendation ${recommendation.tone}"><strong>${recommendation.title}</strong><span>${recommendation.text}</span></div>
     </article>`;
   }).join("");
+}
+
+function exerciseRecommendation(entries) {
+  const latest = [...entries].sort((a, b) => a.date.localeCompare(b.date)).at(-1);
+  const sets = latest?.sets.filter(set => Number(set.reps) > 0) || [];
+  if (!sets.length) return { tone: "neutral", title: "Uzupełnij ostatni trening", text: "Wpisz powtórzenia i wybierz kolor serii, aby otrzymać propozycję ciężaru." };
+  const marked = sets.filter(set => set.effort);
+  if (!marked.length) return { tone: "neutral", title: "Oznacz odczucie po seriach", text: "Kolor pozwoli ocenić, czy zwiększyć, utrzymać czy zmniejszyć obciążenie." };
+  const currentWeight = Math.max(...sets.map(set => Number(set.weight) || 0));
+  const avgReps = sets.reduce((sum, set) => sum + Number(set.reps), 0) / sets.length;
+  const redShare = marked.filter(set => set.effort === "red").length / marked.length;
+  const greenShare = marked.filter(set => set.effort === "green").length / marked.length;
+  if (redShare >= .5) {
+    const decrease = currentWeight > 0 ? Math.max(2.5, Math.round(currentWeight * .075 / 2.5) * 2.5) : 0;
+    return { tone: "down", title: "Zmniejsz ciężar", text: currentWeight > 0 ? `Ostatnie serie były na granicy przy średnio ${formatNumber(avgReps)} powt. Spróbuj ${formatNumber(Math.max(0, currentWeight - decrease))} kg (−${formatNumber(decrease)} kg).` : "Ostatnie serie były na granicy. Zmniejsz obciążenie lub liczbę powtórzeń." };
+  }
+  if (greenShare >= .5) {
+    const increase = currentWeight >= 50 ? 5 : 2.5;
+    return { tone: "up", title: "Możesz zwiększyć ciężar", text: currentWeight > 0 ? `Przy średnio ${formatNumber(avgReps)} powt. został duży zapas. Spróbuj ${formatNumber(currentWeight + increase)} kg (+${formatNumber(increase)} kg).` : "Serie miały duży zapas. Dodaj najmniejszy dostępny ciężar." };
+  }
+  return { tone: "steady", title: "Utrzymaj ciężar", text: `Przy średnio ${formatNumber(avgReps)} powt. obciążenie wygląda odpowiednio. Powtórz je i obserwuj kolory serii.` };
 }
 
 function metricChange(points, unit) {
@@ -389,18 +429,6 @@ function buildChartSvg(points, unit, ariaLabel, variant) {
   return `<svg class="${variant}-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(ariaLabel)}"><defs><linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-opacity=".22"/><stop offset="1" stop-opacity="0"/></linearGradient></defs>${grid}<path class="chart-area" style="fill:url(#${gradientId})" d="${area}"/><path class="chart-line" d="${path}"/>${points.map((point,index) => `<circle class="chart-dot" cx="${x(index)}" cy="${y(point.value)}" r="4"/><text class="chart-value" x="${x(index)}" y="${y(point.value)-9}" text-anchor="middle">${formatNumber(point.value)} ${unit}</text>${(index % labelEvery === 0 || index === points.length - 1) ? `<text class="axis-label" x="${x(index)}" y="${height-15}" text-anchor="middle">${formatDate(point.date, { day: "2-digit", month: "short" })}</text>` : ""}`).join("")}</svg>`;
 }
 
-function renderInsights(entries) {
-  const points = aggregateByDate(entries, "weight");
-  let title = "Zacznij budować swój progres";
-  let text = "Dodaj pierwszy trening i uzupełnij serie. Gdy pojawią się dane, pokażemy tutaj najważniejszy wniosek z Twoich wyników.";
-  if (points.length === 1) { title = "Pierwszy punkt odniesienia"; text = `Masz już zapisany trening. Kontynuuj regularne wpisy, aby zobaczyć kierunek zmian i porównać ciężary w czasie.`; }
-  if (points.length > 1) {
-    const diff = points.at(-1).value - points[0].value;
-    title = diff >= 0 ? "Siła idzie w górę" : "Każdy trening daje informację";
-    text = diff > 0 ? `Maksymalny ciężar wzrósł o ${formatNumber(diff)} kg w wybranym okresie. Utrzymuj regularność i zwiększaj obciążenie stopniowo.` : diff === 0 ? "Maksymalny ciężar jest stabilny. Sprawdź również objętość i liczbę powtórzeń — progres nie zawsze oznacza więcej kilogramów." : "Ciężar jest niższy niż na początku zakresu. Regeneracja i technika są równie ważne jak wynik — obserwuj trend w kolejnych treningach.";
-  }
-  $("#insight-card").innerHTML = `<span class="insight-icon"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 22h4M8.5 14.5A6 6 0 1 1 15.5 14.5c-.9.7-1.3 1.4-1.5 2.5h-4c-.2-1.1-.6-1.8-1.5-2.5Z"/></svg></span><h2>${title}</h2><p>${text}</p>`;
-}
 
 function renderRecent(entries) {
   const recent = [...entries].reverse().slice(0, 5);
