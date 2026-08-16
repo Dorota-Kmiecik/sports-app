@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.view.ViewGroup;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
+import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
@@ -38,6 +39,7 @@ public class MainActivity extends Activity {
         settings.setAllowContentAccess(false);
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
+        webView.setWebChromeClient(new WebChromeClient());
 
         WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
                 .addPathHandler(
